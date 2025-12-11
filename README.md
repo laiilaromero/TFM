@@ -20,5 +20,11 @@ The project assesses the feasibility and limitations of combining **synthetic tr
 
 This work does not aim to replace official LCA calculations, but rather to investigate whether predictive models can support early-stage decision-making under data uncertainty.
 
+# Option 1: Install with conda
+conda env create -f environment.yml
+conda activate tfm
+
+# Option 2: Install with pip (limited)
+pip install -r requirements.txt
 
 
