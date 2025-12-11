@@ -20,7 +20,5 @@ The project assesses the feasibility and limitations of combining **synthetic tr
 
 This work does not aim to replace official LCA calculations, but rather to investigate whether predictive models can support early-stage decision-making under data uncertainty.
 
----
 
-## 📂 Repository Structure
 
