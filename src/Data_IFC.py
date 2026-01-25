@@ -73,8 +73,16 @@ for elem in all_elements:
 # -----------------------------------------
 df_ifc = pd.DataFrame(rows)
 
-# Separar por elementos target si quieres
+# Separar por elementos target 
 df_targets = df_ifc[df_ifc["is_target_class"]]
+#Crear datframe para generación datos sinteticos
+df_ifc_clean= df_targets[
+    (df_targets["volume_m3"].notna())&
+    (df_targets["area_m2"].notna()) &
+    (df_targets["volume_m3"] > 0) &
+    (df_targets["area_m2"] > 0)
+].copy()
+
 
 # -----------------------------------------
 # Mostrar resultados
@@ -84,12 +92,14 @@ df_targets = df_ifc[df_ifc["is_target_class"]]
 
 print("\n=== Todos los elementos ===")
 print(df_ifc.head())
-#Exporta Datframes
+# #Exporta Datframes
 OUTPUT_DIR  = ROOT/"outputs"
 CSV_DIR = OUTPUT_DIR / "csv"
 df_ifc.to_csv(CSV_DIR/"Ifc_all_elements.csv",index=False, sep=";")
 df_targets.to_csv(CSV_DIR/"ifc_target_elements.csv", index=False, sep=";")
-print("\n CSV guardado")
-print("- ifc_all_elements.csv (todos los elementos")
-print(" - ifc_target_elements.csv (solo Walls, Slabs, Beams, Columns)")
+df_ifc_clean.to_csv(CSV_DIR /"df_ifc_clean.csv", index=False, sep=";")
+# print("\n CSV guardado")
+# print("- ifc_all_elements.csv (todos los elementos")
+# print(" - ifc_target_elements.csv (solo Walls, Slabs, Beams, Columns)")
+
 

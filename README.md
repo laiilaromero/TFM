@@ -1,7 +1,7 @@
 
-# TFM – IFC + EPD Integration and Machine Learning for Embodied Carbon Estimation
+# Thesis – IFC + EPD Integration and Machine Learning for Embodied Carbon Estimation
 
-This repository contains the code developed for a Master's Thesis focused on exploring an open and reproducible workflow that combines **IFC models**, **EPD data**, and **machine-learning techniques** to estimate the embodied carbon of concrete elements.
+This repository contains the code developed for a Master's Thesis focused on exploring an Pipeline workflow that combines **IFC models**, **EPD data**, and **machine-learning techniques** to estimate the embodied carbon of concrete elements.
 
 The project assesses the feasibility and limitations of combining **synthetic training data** with **real IFC-EPD data**, to support early-stage environmental assessments when information is incomplete.
 

@@ -1,129 +1,204 @@
-import ifcopenshell
-import ifcopenshell.geom
-from OCC.Core.BRepGProp import brepgprop_VolumeProperties, brepgprop_SurfaceProperties
-from OCC.Core.GProp import GProp_GProps
 import pandas as pd
-import os
-import joblib
-import numpy as np
-import json
-from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.linear_model import LinearRegression
-from sklearn.preprocessing import StandardScaler
+from openpyxl import workbook
 import tensorflow as tf
-from tensorflow.keras.layers import Input
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense
 from tensorflow.keras.models import load_model
 from sklearn.neural_network import MLPRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error,r2_score
 import joblib
+from joblib import load
 from pathlib import Path
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_absolute_error, mean_squared_error,r2_score
+import numpy as np
+import matplotlib
+import matplotlib.pyplot as plt
 # # -----------------------------------------
-# # Leer Dataframe de EDA----------------------------------------------------------
+# # Leer Dataframe----------------------------------------------------------
 ROOT = Path(__file__).resolve().parents[1]
 RES_DIR =ROOT/"outputs"/"resultados"
-df_ifc = pd.read_pickle(RES_DIR/"df_ifc_limpio.pkl")
-epd_subset = pd.read_pickle(RES_DIR/"epd_subset_limpio.pkl")
-epd_subset.loc[epd_subset["Name (en)"].str.contains("1 Ready-mixed concrete mixtures: Multibeton R30C3D16S4XC2XC1", na=False), "material_norm"] = "concrete"
+df_real=pd.read_pickle(RES_DIR/"df_real.pkl")
+df_synth=pd.read_pickle(RES_DIR/"df_synth.pkl")
+#Cargar modelos-------------------------------------------------------------
+MODEL_DIR=ROOT/"outputs"/"modelos"
+rl_real=joblib.load(MODEL_DIR/"rl_real.pkl")
+rl_synth=joblib.load(MODEL_DIR/"rl_synth.pkl")
+rf_real=joblib.load(MODEL_DIR/"rf_real.pkl")
+rf_synth=joblib.load(MODEL_DIR/"rf_synth.pkl")
+scaler_real=joblib.load(MODEL_DIR/"scaler_real.pkl")
+scaler_synth=joblib.load(MODEL_DIR/"scaler_synth.pkl")
+nn_real=load_model(MODEL_DIR/"nn_real.keras")
+nn_synth=load_model(MODEL_DIR/"nn_synth.keras")
+cols_real=joblib.load(MODEL_DIR/"columns_real.pkl")
+cols_mix=joblib.load(MODEL_DIR/"columns_mix.pkl")
+#------Prepara datos de Test------------------------------------------------
+X_real = df_real[["type", "volume_m3", "area_m2"]]
+X_mix  = df_synth[["type", "volume_m3", "area_m2"]]
+y_real = df_real["GWP"]
+y_mix  = df_synth["GWP"]
+#one-hot encoding
+X_real = pd.get_dummies(X_real, columns=["type"], drop_first=True)
+X_mix = pd.get_dummies(X_mix, columns=["type"], drop_first=True)
+#Reindexar para igual columnas con el training
+X_real = X_real.reindex(columns=cols_real, fill_value=0)
+X_mix  = X_mix.reindex(columns=cols_mix, fill_value=0)
+#Split de test
+Xr_train, Xr_test, yr_train, yr_test = train_test_split(X_real,y_real, test_size=0.2, random_state=42)
+Xm_train, Xm_test, ym_train, ym_test = train_test_split(X_mix,y_mix, test_size=0.2, random_state=42)
+Xr_test_scaled=scaler_real.transform(Xr_test)
+Xm_test_scaled=scaler_synth.transform(Xm_test)
+#Predicciones--------------------------
+#RL
+y_pred_rl_real = rl_real.predict(Xr_test)
+y_pred_rl_synth = rl_synth.predict(Xm_test)
+# Métricas REAL
+mae_real  = mean_absolute_error(yr_test, y_pred_rl_real)
+rmse_real = np.sqrt(mean_squared_error(yr_test, y_pred_rl_real))
+r2_real   = r2_score(yr_test, y_pred_rl_real)
+#Métrica Sintetico
+mae_synth  = mean_absolute_error(ym_test, y_pred_rl_synth)
+rmse_synth = np.sqrt(mean_squared_error(ym_test, y_pred_rl_synth))
+r2_synth   = r2_score(ym_test, y_pred_rl_synth)
 
-#------------------------Unir Tablas-------------------------------------------
-df_merged = df_ifc.merge(epd_subset, on="material_norm", how="left")
-df_merged2= df_merged[df_merged["Module"].isin(["A1","A2","A3"])].copy()
-#print(df_merged2.head(10))
-# #Calcular el C02 de Concrete-------------------------------------------------
-df_merged2["CO2_Kg"]= df_merged2["volume_m3"]*df_merged2["GWP"]
-df_total=df_merged2.pivot_table(
-    index="type",
-    columns="Module",
-    values="CO2_Kg",
-    aggfunc="sum"
+print("Linear Regression")
+print("REAL:", mae_real, rmse_real, r2_real)
+print("REAL + SYNTH:", mae_synth, rmse_synth, r2_synth)
+# Random Forest
+y_pred_rf_real  = rf_real.predict(Xr_test)
+y_pred_rf_synth = rf_synth.predict(Xm_test)
+# # Métricas REAL
+mae_real_rf  = mean_absolute_error(yr_test, y_pred_rf_real)
+rmse_real_rf = np.sqrt(mean_squared_error(yr_test, y_pred_rf_real))
+r2_real_rf  = r2_score(yr_test, y_pred_rf_real)
+#Métrica Sintetico
+mae_synth_rf = mean_absolute_error(ym_test,y_pred_rf_synth)
+rmse_synth_rf= np.sqrt(mean_squared_error(ym_test,y_pred_rf_synth))
+r2_synth_rf = r2_score(ym_test, y_pred_rf_synth)
+print("Random Forest")
+print("REAL:", mae_real_rf, rmse_real_rf, r2_real_rf)
+print("REAL + SYNTH:", mae_synth_rf, rmse_synth_rf, r2_synth_rf)
+
+# # Redes Neuronales
+y_pred_nn_real  = nn_real.predict(Xr_test_scaled).ravel()
+y_pred_nn_synth = nn_synth.predict(Xm_test_scaled).ravel()
+# # Métricas REAL
+mae_real_nn  = mean_absolute_error(yr_test, y_pred_nn_real)
+rmse_real_nn = np.sqrt(mean_squared_error(yr_test, y_pred_nn_real))
+r2_real_nn  = r2_score(yr_test, y_pred_nn_real)
+#Métrica Sintetico
+mae_synth_nn = mean_absolute_error(ym_test,y_pred_nn_synth)
+rmse_synth_nn= np.sqrt(mean_squared_error(ym_test, y_pred_nn_synth))
+r2_synth_nn = r2_score(ym_test, y_pred_nn_synth)
+print("Redes Neuronales ")
+print("REAL:", mae_real_nn, rmse_real_nn, r2_real_nn)
+print("REAL + SYNTH:", mae_synth_nn, rmse_synth_nn, r2_synth_nn)
+#Graficos de valores por Modelo
+#RL
+# scenarios = ["Real", "Real+Sintético"]
+# mae_values=[96.46,93.19]
+# plt.figure(figsize=(7,7))
+# plt.bar(scenarios,mae_values)
+# plt.ylabel("MAE [kg CO₂ eq]")
+# plt.title("Comparación MAE – Regresión Lineal")
+# plt.legend()
+# plt.grid(alpha=0.3)
+# plt.show()
+#RF
+# plt.figure(figsize=(12, 5))
+# plt.subplot(1,2,1)
+# plt.scatter(yr_test, y_pred_rf_real, alpha=0.7)
+# plt.plot(
+#     [yr_test.min(), yr_test.max()],
+#     [yr_test.min(), yr_test.max()],
+#     linestyle='--'
+# )
+# plt.xlabel("GWP real")
+# plt.ylabel("GWP predicho")
+# plt.title("Datos Reales")
+# plt.subplot(1,2,1)
+# plt.scatter(ym_test, y_pred_rf_synth, alpha=0.7)
+# plt.plot(
+#     [ym_test.min(), ym_test.max()],
+#     [ym_test.min(), ym_test.max()],
+#     linestyle='--'
+# )
+# plt.xlabel("GWP real")
+# plt.ylabel("GWP predicho")
+# plt.title("Datos Reales + sintéticos")
+
+# plt.tight_layout()
+# plt.show()
+#RN
+plt.figure(figsize=(12, 5))
+plt.subplot(1,2,1)
+plt.scatter(yr_test, y_pred_nn_real, alpha=0.7)
+plt.plot(
+    [yr_test.min(), yr_test.max()],
+    [yr_test.min(), yr_test.max()],
+    linestyle='--'
 )
-df_total =df_total.rename(columns={"A1":"A1_CO2","A2":"A2_CO2","A3":"A3_CO2"})
-df_total["total_A1A3_CO2"]=df_total["A1_CO2"]+ df_total["A2_CO2"] + df_total["A3_CO2"]
-print(df_total.head(10))
-
-# # ------------------------- Cargar modelos entrenados -------------------------
-MODEL_DIR =ROOT/"outputs"/"modelos"
-rf = joblib.load(MODEL_DIR/"rf_model.pkl")
-rl = joblib.load(MODEL_DIR/"lr_model.pkl")
-scaler = joblib.load(MODEL_DIR/"scaler.pkl")
-nn_model = load_model(MODEL_DIR/"nn_model.h5", compile=False)
-nn_model.compile(optimizer='adam', loss='mse', metrics=['mae'])
-
-# # ------------------------- Cargar columnas del training ---------------------
-with open(MODEL_DIR/"train_columns.json","r") as f:
-    train_cols = json.load(f)
-
-# # ------------------------- Recalcular CO2 en df_merged2 ----------------------
-A1 = df_merged2[df_merged2["Module"] == "A1"]["GWP"].unique()[0]
-A2 = df_merged2[df_merged2["Module"] == "A2"]["GWP"].unique()[0]
-A3 = df_merged2[df_merged2["Module"] == "A3"]["GWP"].unique()[0]
-
-df_merged2["A1_CO2"] = df_merged2["volume_m3"] * A1
-df_merged2["A2_CO2"] = df_merged2["volume_m3"] * A2
-df_merged2["A3_CO2"] = df_merged2["volume_m3"] * A3
-df_merged2["total_A1A3_CO2"] = df_merged2["A1_CO2"] + df_merged2["A2_CO2"] + df_merged2["A3_CO2"]
-
-# # ------------------------- Preparar dataset real ----------------------------
-X_real = df_merged2[["type","Espesor_mm","area_m2","volume_m3"]].copy()
-X_real_encoded = pd.get_dummies(X_real, columns=["type"])
-X_real_encoded = X_real_encoded.reindex(columns=train_cols, fill_value=0)
-y_real = df_merged2[['A1_CO2','A2_CO2','A3_CO2','total_A1A3_CO2']]
-
-# # ------------------------- Predicciones iniciales --------------------------
-# # Random Forest
-y_pred_rf = rf.predict(X_real_encoded)
-# Linear Regression
-y_pred_rl = rl.predict(X_real_encoded)
-# Neural Network (escalar)
-X_real_scaled = scaler.transform(X_real_encoded)
-y_pred_nn = nn_model.predict(X_real_scaled)
-
-# # ------------------------- Métricas iniciales ------------------------------
-print("-----Resultados Iniciales Real Data-----------")
-print("RF MAE:", mean_absolute_error(y_real, y_pred_rf))
-print("RF R2:", r2_score(y_real, y_pred_rf))
-print("LR MAE:", mean_absolute_error(y_real, y_pred_rl))
-print("LR R2 :", r2_score(y_real, y_pred_rl))
-print("NN MAE:", mean_absolute_error(y_real, y_pred_nn))
-print("NN R2 :", r2_score(y_real, y_pred_nn))
-
-# # ------------------------- Fine-tuning de la NN ----------------------------
-# # Ajustar la NN con los datos reales 
-nn_model.fit(
-    X_real_scaled,
-    y_real,
-    epochs=50,      
-    batch_size=8,
-    verbose=1
+plt.xlabel("GWP real")
+plt.ylabel("GWP predicho")
+plt.title("Datos Reales")
+plt.subplot(1,2,1)
+plt.scatter(ym_test, y_pred_nn_synth, alpha=0.7)
+plt.plot(
+    [ym_test.min(), ym_test.max()],
+    [ym_test.min(), ym_test.max()],
+    linestyle='--'
 )
+plt.xlabel("GWP real")
+plt.ylabel("GWP predicho")
+plt.title("Datos Reales + sintéticos")
 
-# Guardar modelo fine-tuned
-nn_model.save(MODEL_DIR/"nn_model_finetuned.h5")
-
-# ------------------------- Predicciones después de fine-tuning -------------
-y_pred_nn_finetuned = nn_model.predict(X_real_scaled)
-
-print("-----NN Fine-Tuned Real Data-----------")
-print("NN MAE (finetuned):", mean_absolute_error(y_real, y_pred_nn_finetuned))
-print("NN R2 (finetuned):", r2_score(y_real, y_pred_nn_finetuned))
-#----------------Representacion Gráfica--------------------------------------------
-import matplotlib.pyplot as plt
-IMG_DIR= ROOT/"outputs"/"imágen"
-
-plt.figure(figsize=(8,6))
-plt.scatter(y_real['total_A1A3_CO2'], y_pred_rf[:,3], alpha=0.7, color='blue', label='Random Forest')
-plt.scatter(y_real['total_A1A3_CO2'], y_pred_rl[:,3], alpha=0.7, color='green', label='Regresión Lineal')
-plt.scatter(y_real['total_A1A3_CO2'], y_pred_nn_finetuned[:,3], alpha=0.7, color='red', label='NN Fine-Tuned')
-plt.plot([y_real['total_A1A3_CO2'].min(), y_real['total_A1A3_CO2'].max()],
-         [y_real['total_A1A3_CO2'].min(), y_real['total_A1A3_CO2'].max()],
-         color='black', linestyle='--', label='Perfecta Predicción')
-plt.xlabel('GWP real [kgCO2]')
-plt.ylabel('GWP predicho [kgCO2]')
-plt.title('Comparación Predicción vs Valores Reales - Total A1-A3')
-plt.legend()
 plt.tight_layout()
-plt.savefig(IMG_DIR/'pred_vs_real.png', dpi=300)
 plt.show()
+#Tabla final comparativa
+import pandas as pd
+
+# Crear diccionario con resultados
+results = {
+    "Modelo": [
+        "Linear Regression",
+        "Linear Regression",
+        "Random Forest",
+        "Random Forest",
+        "Neural Network",
+        "Neural Network"
+    ],
+    "Dataset": [
+        "Real",
+        "Real + Sintético",
+        "Real",
+        "Real + Sintético",
+        "Real",
+        "Real + Sintético"
+    ],
+    "MAE": [
+        96.46,
+        93.19,
+        105.87,
+        45.90,
+        95.87,
+        93.40
+    ],
+    "RMSE": [
+        102.75,
+        99.75,
+        114.84,
+        61.46,
+        102.70,
+        99.88
+    ],
+    "R2": [
+        -0.02,
+        0.02,
+        -0.28,
+        0.63,
+        -0.02,
+        0.02
+    ]
+}
+
+# Crear DataFrame
+df_results = pd.DataFrame(results)
+df_results.to_excel(RES_DIR/"tabla de resultados.xlsx", engine="openpyxl")
