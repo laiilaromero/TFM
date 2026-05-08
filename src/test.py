@@ -33,8 +33,8 @@ cols_mix=joblib.load(MODEL_DIR/"columns_mix.pkl")
 #------Prepara datos de Test------------------------------------------------
 X_real = df_real[["type", "volume_m3", "area_m2"]]
 X_mix  = df_synth[["type", "volume_m3", "area_m2"]]
-y_real = df_real["GWP"]
-y_mix  = df_synth["GWP"]
+y_real = df_real["GWP_total"]
+y_mix  = df_synth["GWP_total"]
 #one-hot encoding
 X_real = pd.get_dummies(X_real, columns=["type"], drop_first=True)
 X_mix = pd.get_dummies(X_mix, columns=["type"], drop_first=True)

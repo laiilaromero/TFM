@@ -89,7 +89,7 @@ df_ifc_clean= df_targets[
 # -----------------------------------------
 #print("=== Elementos Target ===")
 #print(df_targets)
-
+print(df_ifc_clean.info())
 print("\n=== Todos los elementos ===")
 print(df_ifc.head())
 # #Exporta Datframes

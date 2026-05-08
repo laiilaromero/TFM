@@ -46,13 +46,14 @@ df_real = df_ifc.merge(
 df_real["GWP_total"]= df_real["volume_m3"]* df_real["GWP"]
 print(df_real.head())
 features = ["type", "volume_m3", "area_m2", "Espesor_mm"]
-target = "GWP"
+target = "GWP_total"
 df_listo = df_real[features + [target]].copy()
 df_listo = df_listo[
     (df_listo["volume_m3"]> 0) &
-    (df_listo["GWP"].notna())
+    (df_listo["GWP_total"].notna())
 ].copy()
 print(df_listo.head())
+print(df_listo.info())
 #---------------------------------------------------
 #  Generar datos sintéticos para entrenamiento
 # -------------------------------------------------
@@ -77,7 +78,7 @@ df_listo.to_pickle(RES_DIR2/"df_real.pkl")
 df_synth.to_pickle(RES_DIR2/"df_synth.pkl")
 df_mix = pd.concat([df_listo, df_synth], ignore_index=True)
 df_mix.to_pickle(RES_DIR2/"df_mix.pkl")
-print(df_synth.head(20))
+print(df_mix.info())
 # Comparación estadistica----------------
 stats = pd.DataFrame({
     "real_mean": df_listo[["volume_m3","area_m2"]].mean(),
@@ -92,14 +93,14 @@ plt.figure(figsize=(7,5))
 
 plt.scatter(
     df_listo["volume_m3"],
-    df_listo["GWP"],
+    df_listo["GWP_total"],
     alpha=0.7,
     label="Real"
 )
 
 plt.scatter(
     df_synth["volume_m3"],
-    df_synth["GWP"],
+    df_synth["GWP_total"],
     alpha=0.4,
     label="Synthetic"
 )

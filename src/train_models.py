@@ -17,14 +17,15 @@ DATASETS_ROOT= ROOT/"outputs"/"resultados"
 MODEL_DIR=ROOT/"outputs"/"modelos"
 df_real = pd.read_pickle(DATASETS_ROOT/"df_real.pkl")
 df_mix = pd.read_pickle(DATASETS_ROOT/"df_mix.pkl")
-# print(df_mix.dtypes)
-# print(df_real.dtypes)
+print(df_mix.dtypes)
+print(df_real.dtypes)
+print(df_real.info())
 #print(df_real["Espesor_mm"].isna().mean())
 #--------------Hipotesis 1- Datos Reales---------------------------------------------------------
 df_h1= df_real.copy()
 #Elección de entrada y salida
 X1 = df_h1[["type", "volume_m3", "area_m2"]]
-y1 = df_h1["GWP"]
+y1 = df_h1["GWP_total"]
 #one-hot encoding para type
 X1 = pd.get_dummies(X1, columns=["type"], drop_first=True)
 #Separamos datos para entrenar y evaluar
@@ -32,7 +33,7 @@ X1_train, X1_test, y1_train, y1_test = train_test_split(X1,y1, test_size=0.2, ra
 #---------------Hipotesis 2 - Datos R+ Datos S ----------------------------------------------------
 df_h2=df_mix.copy()
 X2 = df_h2[["type", "volume_m3", "area_m2"]]
-y2 = df_h2["GWP"]
+y2 = df_h2["GWP_total"]
 X2 = pd.get_dummies(X2, columns=["type"], drop_first=True)
 X2_train, X2_test, y2_train, y2_test = train_test_split(X2, y2, test_size=0.2, random_state=42)
 joblib.dump(X1_train.columns, MODEL_DIR / "columns_real.pkl")
